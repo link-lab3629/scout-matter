@@ -114,7 +114,7 @@ This objective guides the fraction of central atoms having the requested soft
 coordination:
 
   $$
-  H_a(k) = \exp\!\left[-\left(\frac{C_a-k}{\tau}\right)^2\right],
+  H_a(k) = \exp\,\left[-\left(\frac{C_a-k}{\tau}\right)^2\right],
   \qquad
   \mathcal L_{\mathrm{share}}
   = 1-\frac{1}{N_A}\sum_{a=1}^{N_A}H_a(k).
@@ -157,19 +157,19 @@ images. The per-center loss is
 $$
 \mathcal L_a^{\mathrm{softplus}} =
 T\sum_{i=1}^{k}
-\operatorname{softplus}\!\left(\frac{d_{a,(i)}-(r_c-m)}{T}\right)
+\mathrm{softplus}\,\left(\frac{d_{a,(i)}-(r_c-m)}{T}\right)
 +T\sum_{i=k+1}^{M}
-\operatorname{softplus}\!\left(\frac{(r_c+m)-d_{a,(i)}}{T}\right),
+\mathrm{softplus}\,\left(\frac{(r_c+m)-d_{a,(i)}}{T}\right),
 $$
 
-with $\operatorname{softplus}(x)=\log(1+e^x)$. A sigmoid soft count $C_a$ is
+with $\mathrm{softplus}(x)=\log(1+e^x)$. A sigmoid soft count $C_a$ is
 also used to determine whether the center lies within the acceptable
 coordination interval $[k-\delta_{\mathrm{CN}},k+\delta_{\mathrm{CN}}]$:
 
 $$
 s_a =
-\sigma\!\left(\frac{C_a-(k-\delta_{\mathrm{CN}})}{\tau_{\mathrm{CN}}}\right)
-\sigma\!\left(\frac{(k+\delta_{\mathrm{CN}})-C_a}{\tau_{\mathrm{CN}}}\right).
+\sigma\,\left(\frac{C_a-(k-\delta_{\mathrm{CN}})}{\tau_{\mathrm{CN}}}\right)
+\sigma\,\left(\frac{(k+\delta_{\mathrm{CN}})-C_a}{\tau_{\mathrm{CN}}}\right).
 $$
 
 The loss for one coordination constraint is
@@ -226,8 +226,8 @@ For central atom $a$, the differentiable coordination number is
 
 $$
 C_a = \sum_{b\in B,\,\mathbf n}
-\sigma\!\left[\alpha\left(r_{c,a}-d_{ab\mathbf n}\right)\right]
-\; - \; \mathbf 1\!\left[Z_a\in B\right],
+\sigma\,\left[\alpha\left(r_{c,a}-d_{ab\mathbf n}\right)\right]
+\; - \; \mathbf 1\,\left[Z_a\in B\right],
 \qquad
 \sigma(x)=\frac{1}{1+e^{-x}},
 $$
