@@ -1,6 +1,13 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+"""Predictor-corrector sampling with optional differentiable guidance.
+
+The sampler supports continuous and discrete state fields, inpainting masks,
+self-recurrent refinement, and guidance losses that modify the position and
+unit-cell score fields during denoising.
+"""
+
 from __future__ import annotations
 
 from typing import Generic, Mapping, Tuple, TypeVar, Callable
@@ -14,10 +21,21 @@ from mattergen.diffusion.data.batched_data import BatchedData
 from mattergen.diffusion.diffusion_module import DiffusionModule
 from mattergen.diffusion.lightning_module import DiffusionLightningModule
 from mattergen.diffusion.sampling.pc_partials import CorrectorPartial, PredictorPartial
+from mattergen.diffusion.sampling._guidance_speedups import (
+    _fused_guidance_update,
+    cache_sde_coefficients,
+    install_coordination_index_cache,
+    use_fast_guidance,
+)
+import os
+
+# Enable coordination-index caching by default. Set
+# SCOUT_DISABLE_COORD_CACHE=1 to disable it for troubleshooting.
+install_coordination_index_cache()
 
 Diffusable = TypeVar(
     "Diffusable", bound=BatchedData
-)  # Don't use 'T' because it clashes with the 'T' for time
+)  # Avoid reusing T, which denotes diffusion time in this module.
 SampleAndMean = Tuple[Diffusable, Diffusable]
 SampleAndMeanAndMaybeRecords = Tuple[Diffusable, Diffusable, list[Diffusable] | None]
 SampleAndMeanAndRecords = Tuple[Diffusable, Diffusable, list[Diffusable]]
@@ -31,6 +49,13 @@ def _prepare_guidance_grad(
     normalize: bool,
     threshold: float = 1e-20,
 ) -> torch.Tensor:
+    """Normalize gradients independently for each structure in the batch.
+
+    ``batch_idx`` maps entries in a field such as ``pos`` to structures. For
+    dense fields, ``None`` indicates that the first dimension is already the
+    structure dimension. Gradients below ``threshold`` are masked without a
+    host-device synchronization.
+    """
     flat = g.reshape(g.shape[0], -1)
     squared_norm = flat.square().sum(dim=1)
     if batch_idx is None:
@@ -49,7 +74,12 @@ def _prepare_guidance_grad(
 
 
 class PredictorCorrector(Generic[Diffusable]):
-    """Generates samples using predictor-corrector sampling."""
+    """Generate samples with predictor-corrector diffusion and optional guidance.
+
+    The sampler supports continuous and discrete corruptions, inpainting masks,
+    self-recurrent refinement, and differentiable guidance losses on structure
+    fields such as positions and unit cells.
+    """
 
     def __init__(
         self,
@@ -69,16 +99,26 @@ class PredictorCorrector(Generic[Diffusable]):
         print_loss_history: bool = False,  # Flag to control printing of loss history
         algo: int = 0,  # Algorithm type
     ):
-        """
+        """Initialize a predictor-corrector sampler.
+
         Args:
-            diffusion_module: diffusion module
-            predictor_partials: partials for constructing predictors. Keys are the names of the corruptions.
-            corrector_partials: partials for constructing correctors. Keys are the names of the corruptions.
-            device: device to run on
-            n_steps_corrector: number of corrector steps
-            N: number of noise levels
-            eps_t: diffusion time to stop denoising at
-            max_t: diffusion time to start denoising at. If None, defaults to the maximum diffusion time. You may want to start at T-0.01, say, for numerical stability.
+            diffusion_module: Diffusion model and corruption process.
+            predictor_partials: Factories for predictor updates, keyed by
+                corruption name.
+            corrector_partials: Factories for corrector updates, keyed by
+                corruption name.
+            device: Device on which sampling is performed.
+            n_steps_corrector: Number of corrector updates at each timestep.
+            N: Number of diffusion timesteps.
+            eps_t: Final diffusion time.
+            max_t: Initial diffusion time. Defaults to the corruption horizon.
+            diffusion_loss_fn: Optional differentiable loss used for guidance.
+            diffusion_loss_weight: Forward weight, backward weight, and an
+                optional normalization flag for guidance gradients.
+            self_rec_steps: Number of self-recurrent refinement passes.
+            back_step: Number of backward-guidance updates per guided pass.
+            print_loss_history: Whether to retain per-step guidance losses.
+            algo: Refinement ordering used by the sampling loop.
         """
         self._diffusion_module = diffusion_module
         self.N = N
@@ -115,10 +155,11 @@ class PredictorCorrector(Generic[Diffusable]):
         self._device = device
         self.diffusion_loss_fn = diffusion_loss_fn  
         self.diffusion_loss_weight = diffusion_loss_weight 
-        self.diffusion_loss_history = [] # To keep track of diffusion loss values
-        self.print_loss_history = print_loss_history  # Flag to control printing of loss history
+        self.diffusion_loss_history = []  # Per-step guidance losses, when enabled.
+        self.print_loss_history = print_loss_history
         self.self_rec_steps = self_rec_steps
-        self.back_step = back_step  # Number of steps to go back in the predictor-corrector loop
+        self.back_step = back_step
+        self.algo = algo
 
     @property
     def diffusion_module(self) -> DiffusionModule:
@@ -131,6 +172,14 @@ class PredictorCorrector(Generic[Diffusable]):
     def _score_fn(self, x: Diffusable, t: torch.Tensor) -> Diffusable:
         return self._diffusion_module.score_fn(x, t)
 
+    def _loop_empty_cache(self) -> None:
+        """Periodically release cached CUDA blocks between recurrence passes."""
+        if not hasattr(self, "_empty_cache_counter"):
+            self._empty_cache_counter = 0
+        self._empty_cache_counter += 1
+        if self._empty_cache_counter % 25 == 0:
+            torch.cuda.empty_cache()
+
     @classmethod
     def from_pl_module(cls, pl_module: DiffusionLightningModule, **kwargs) -> PredictorCorrector:
         return cls(diffusion_module=pl_module.diffusion_module, device=pl_module.device, **kwargs)
@@ -139,15 +188,18 @@ class PredictorCorrector(Generic[Diffusable]):
     def sample(
         self, conditioning_data: BatchedData, mask: Mapping[str, torch.Tensor] | None = None
     ) -> SampleAndMean:
-        """Create one sample for each of a batch of conditions.
-        Args:
-            conditioning_data: batched conditioning data. Even if you think you don't want conditioning, you still need to pass a batch of conditions
-               because the sampler uses these to determine the shapes of things to generate.
-            mask: for inpainting. Keys should be a subset of the keys in `data`. 1 indicates data that should be fixed, 0 indicates data that should be replaced with sampled values.
-                Shapes of values in `mask` must match the shapes of values in `conditioning_data`.
-        Returns:
-           (batch, mean_batch). The difference between these is that `mean_batch` has no noise added at the final denoising step.
+        """Generate one sample for each conditioning structure.
 
+        Args:
+            conditioning_data: Batched structures that define the generated
+                fields and their shapes.
+            mask: Optional inpainting mask. Keys must identify fields in
+                ``conditioning_data``; a value of one keeps the conditioning
+                value and a value of zero permits denoising.
+
+        Returns:
+            A pair ``(sample, mean_sample)``. The mean sample omits noise at
+            the final denoising step.
         """
         return self._sample_maybe_record(conditioning_data, mask=mask, record=False)[:2]
 
@@ -155,15 +207,17 @@ class PredictorCorrector(Generic[Diffusable]):
     def sample_with_record(
         self, conditioning_data: BatchedData, mask: Mapping[str, torch.Tensor] | None = None
     ) -> SampleAndMeanAndRecords:
-        """Create one sample for each of a batch of conditions.
-        Args:
-            conditioning_data: batched conditioning data. Even if you think you don't want conditioning, you still need to pass a batch of conditions
-               because the sampler uses these to determine the shapes of things to generate.
-            mask: for inpainting. Keys should be a subset of the keys in `data`. 1 indicates data that should be fixed, 0 indicates data that should be replaced with sampled values.
-                Shapes of values in `mask` must match the shapes of values in `conditioning_data`.
-        Returns:
-           (batch, mean_batch). The difference between these is that `mean_batch` has no noise added at the final denoising step.
+        """Generate samples and return the intermediate denoising trajectory.
 
+        Args:
+            conditioning_data: Batched structures that define the generated
+                fields and their shapes.
+            mask: Optional inpainting mask. A value of one keeps the
+                conditioning value and a value of zero permits denoising.
+
+        Returns:
+            ``(sample, mean_sample, records)``, where ``records`` contains the
+            recorded states produced during denoising.
         """
         return self._sample_maybe_record(conditioning_data, mask=mask, record=True)
 
@@ -174,17 +228,20 @@ class PredictorCorrector(Generic[Diffusable]):
         mask: Mapping[str, torch.Tensor] | None = None,
         record: bool = False,
     ) -> SampleAndMeanAndMaybeRecords:
-        """Create one sample for each of a batch of conditions.
-        Args:
-            conditioning_data: batched conditioning data. Even if you think you don't want conditioning, you still need to pass a batch of conditions
-               because the sampler uses these to determine the shapes of things to generate.
-            mask: for inpainting. Keys should be a subset of the keys in `data`. 1 indicates data that should be fixed, 0 indicates data that should be replaced with sampled values.
-                Shapes of values in `mask` must match the shapes of values in `conditioning_data`.
-        Returns:
-           (batch, mean_batch, recorded_samples, recorded_predictions).
-           The difference between the former two is that `mean_batch` has no noise added at the final denoising step.
-           The latter two are only returned if `record` is True, and contain the samples and predictions from each step of the diffusion process.
+        """Generate samples, optionally retaining denoising states.
 
+        This internal entry point handles device transfer, inpainting masks,
+        and temporary parameter freezing for guided sampling.
+
+        Args:
+            conditioning_data: Batched structures that define the generated
+                fields and their shapes.
+            mask: Optional inpainting mask.
+            record: Whether to retain intermediate denoising states.
+
+        Returns:
+            ``(sample, mean_sample, records)``. ``records`` is ``None`` unless
+            ``record`` is true.
         """
         if isinstance(self._diffusion_module, torch.nn.Module):
             self._diffusion_module.eval()
@@ -192,7 +249,24 @@ class PredictorCorrector(Generic[Diffusable]):
         conditioning_data = conditioning_data.to(self._device)
         mask = {k: v.to(self._device) for k, v in mask.items()}
         batch = _sample_prior(self._multi_corruption, conditioning_data, mask=mask)
-        return self._denoise(batch=batch, mask=mask, record=record)
+        # Guidance needs gradients w.r.t. pos/cell, never model parameters.
+        frozen_parameters = []
+        if (
+            use_fast_guidance()
+            and self.diffusion_loss_fn is not None
+        ):
+            frozen_parameters = [
+                parameter
+                for parameter in self.diffusion_module.parameters()
+                if parameter.requires_grad
+            ]
+            for parameter in frozen_parameters:
+                parameter.requires_grad_(False)
+        try:
+            return self._denoise(batch=batch, mask=mask, record=record)
+        finally:
+            for parameter in frozen_parameters:
+                parameter.requires_grad_(True)
 
     def save_diffusion_loss_history(self, filename: str):
         with open(filename, "w") as f:
@@ -203,18 +277,25 @@ class PredictorCorrector(Generic[Diffusable]):
         diffusion_loss_fn: Callable[[BatchedData, torch.Tensor], torch.Tensor],
         diffusion_loss_weight: list[float],
     ):
-        """Set or update the diffusion loss function and its weight after the module has been initialized."""
+        """Set or update the differentiable guidance loss after initialization.
+
+        ``diffusion_loss_weight`` contains the forward weight, backward weight,
+        and an optional boolean indicating whether guidance gradients should be
+        normalized. When the boolean is omitted, normalization is enabled.
+        """
         self.diffusion_loss_fn = diffusion_loss_fn
         self.diffusion_loss_weight = diffusion_loss_weight
         if len(self.diffusion_loss_weight) == 2:
-            self.diffusion_loss_weight.append(True)  # If not mentionned, use the normalization
+            self.diffusion_loss_weight.append(True)  # Normalize guidance gradients.
 
     def _backward_guidance(self, x0: Diffusable, t: torch.Tensor, score) -> Diffusable:
-            """Update the score with the backward universal guidance function."""
-            grad_dict = {}
-            replace_kwargs = ["pos", "cell"]
-            with torch.set_grad_enabled(True):
-                diffusion_loss = self.diffusion_loss_fn(x0, t)
+        """Apply backward guidance using the configured diffusion loss."""
+        if use_fast_guidance():
+            return self._backward_guidance_fast(x0, t, score)
+        grad_dict = {}
+        replace_kwargs = ["pos", "cell"]
+        with torch.set_grad_enabled(True):
+            diffusion_loss = self.diffusion_loss_fn(x0, t)
             if self.print_loss_history:
                 self.diffusion_loss_history.append(diffusion_loss.cpu().tolist())
             for field in replace_kwargs:
@@ -227,8 +308,6 @@ class PredictorCorrector(Generic[Diffusable]):
                 if grad is None:
                     grad = torch.zeros_like(getattr(x0, field))
                 grad_dict[field] = grad
-            #if grad_dict['pos'].sum() != 0 or grad_dict['cell'].sum() != 0:
-            #   print(grad_dict, diffusion_loss)
             for k in grad_dict:
                 if k in score:
                     g_scaled = _prepare_guidance_grad(
@@ -237,12 +316,54 @@ class PredictorCorrector(Generic[Diffusable]):
                         normalize=self.diffusion_loss_weight[2],
                     )
                     alpha_t, sigma_t = x0.alpha[k]
-                    score[k] = score[k] - self.diffusion_loss_weight[1] * alpha_t / (sigma_t**2) * g_scaled
-            del grad_dict  # Clean up the gradient dictionary
+                    backward_weight = self.diffusion_loss_weight[1]
+                    weight = backward_weight
+                    update = weight * alpha_t / (sigma_t**2) * g_scaled
+                    score[k] = _fused_guidance_update(score[k], update)
+            del grad_dict
             pass
 
+    def _backward_guidance_fast(
+        self, x0: Diffusable, t: torch.Tensor, score
+    ) -> Diffusable:
+        """Apply backward guidance with one first-order batched VJP."""
+        with torch.set_grad_enabled(True):
+            diffusion_loss = self.diffusion_loss_fn(x0, t)
+            ones_seed = getattr(self, "_ones_seed", None)
+            if ones_seed is None or ones_seed.device != diffusion_loss.device or ones_seed.shape != diffusion_loss.shape:
+                ones_seed = torch.ones_like(diffusion_loss)
+                self._ones_seed = ones_seed
+            gradients = torch.autograd.grad(
+                diffusion_loss,
+                (x0.pos, x0.cell),
+                grad_outputs=ones_seed,
+                create_graph=False,
+                allow_unused=True,
+            )
+        if self.print_loss_history:
+            self.diffusion_loss_history.append(diffusion_loss.detach().cpu().tolist())
+        for field, gradient in zip(("pos", "cell"), gradients, strict=True):
+            if field not in score:
+                continue
+            if gradient is None:
+                gradient = torch.zeros_like(getattr(x0, field))
+            gradient = _prepare_guidance_grad(
+                gradient,
+                batch_idx=x0.get_batch_idx(field),
+                batch_size=x0.get_batch_size(),
+                normalize=self.diffusion_loss_weight[2],
+            )
+            alpha_t, sigma_t = x0.alpha[field]
+            backward_weight = self.diffusion_loss_weight[1]
+            weight = backward_weight
+            update = weight * alpha_t / sigma_t.square() * gradient
+            score[field] = _fused_guidance_update(score[field], update)
+        return score
+
     def _forward_guidance(self, batch: Diffusable, t: torch.Tensor, score) -> Diffusable:
-        """Update the score with the forward universal guidance function."""
+        """Apply forward guidance using the configured diffusion loss."""
+        if use_fast_guidance():
+            return self._forward_guidance_fast(batch, t, score)
         # Compute x0|xt
         batch_ = batch._grad_copy()  # Create a shallow copy with gradients enabled
         with torch.set_grad_enabled(True):
@@ -267,8 +388,6 @@ class PredictorCorrector(Generic[Diffusable]):
             if grad is None:
                 grad = torch.zeros_like(getattr(x0, field))
             grad_dict[field] = grad
-        #if grad_dict['pos'].sum() != 0 or grad_dict['cell'].sum() != 0:
-        #        print(grad_dict, diffusion_loss)
         for k in grad_dict:
             if k in score:
                 g_scaled = _prepare_guidance_grad(
@@ -276,26 +395,108 @@ class PredictorCorrector(Generic[Diffusable]):
                     batch_size=batch_.get_batch_size(),
                     normalize=self.diffusion_loss_weight[2],
                 )
-                score[k] = score[k] - self.diffusion_loss_weight[0] * g_scaled
-        del batch_  # Clean up the temporary batch with gradients
-        del grad_dict  # Clean up the gradient dictionary
+                score[k] = _fused_guidance_update(score[k], self.diffusion_loss_weight[0] * g_scaled)
+        del batch_
+        del grad_dict
         pass
+
+    def _forward_guidance_fast(
+        self, batch: Diffusable, t: torch.Tensor, score
+    ) -> Diffusable:
+        """Apply forward guidance with a first-order batched VJP.
+
+        Sampling consumes this gradient as a value and never differentiates the
+        sampler update.  Avoiding a gradient-of-gradient graph therefore keeps
+        the first-order guidance unchanged while substantially reducing memory.
+        """
+        batch_ = batch.replace(
+            pos=batch.pos.detach().requires_grad_(True),
+            cell=batch.cell.detach().requires_grad_(True),
+        )
+        with torch.set_grad_enabled(True):
+            # Preserve score behavior: _predict_x0 computes a fresh score for
+            # the current recurrent state when no score is supplied.
+            x0 = self.diffusion_module._predict_x0(
+                x=batch_,
+                atomic_numbers=self._predictors['atomic_numbers'].corruption._to_non_zero_based(torch.distributions.Categorical(logits=score["atomic_numbers"]).sample()),
+                t=t,
+            )
+            diffusion_loss = self.diffusion_loss_fn(x0, t)
+            ones_seed = getattr(self, "_ones_seed", None)
+            if (
+                ones_seed is None
+                or ones_seed.device != diffusion_loss.device
+                or ones_seed.shape != diffusion_loss.shape
+            ):
+                ones_seed = torch.ones_like(diffusion_loss)
+                self._ones_seed = ones_seed
+            gradients = torch.autograd.grad(
+                diffusion_loss,
+                (batch_.pos, batch_.cell),
+                grad_outputs=ones_seed,
+                create_graph=False,
+                allow_unused=True,
+            )
+        if self.print_loss_history:
+            self.diffusion_loss_history.append(diffusion_loss.detach().cpu().tolist())
+        batch_size = batch_.num_graphs
+        pos_batch_idx = batch_.batch
+        for field, gradient in zip(("pos", "cell"), gradients, strict=True):
+            if field not in score:
+                continue
+            if gradient is None:
+                gradient = torch.zeros_like(getattr(batch_, field))
+            gradient = _prepare_guidance_grad(
+                gradient,
+                batch_idx=pos_batch_idx if field == "pos" else None,
+                batch_size=batch_size,
+                normalize=self.diffusion_loss_weight[2],
+            )
+            score[field] = _fused_guidance_update(
+                score[field], gradient, scale=self.diffusion_loss_weight[0]
+            )
+        del batch_
+        return score
     
     def forward_corruption(self, batch_k: Diffusable, t: torch.Tensor, s: torch.Tensor, k: str, batch_idx: torch.Tensor | None = None) -> Tuple[Diffusable, torch.Tensor]:
-        """Forward pass for a corruption from s to t."""
+        """Apply a field corruption from time ``s`` to time ``t``.
+
+        Returns both the sampled field and its conditional mean.
+        """
         return (
         self._multi_corruption.corruptions[k].sample_from_s(batch_k, t, s, batch_idx=batch_idx),
         self._multi_corruption.corruptions[k].marginal_prob_from_s(batch_k, t, s, batch_idx=batch_idx)[0]
                         )
     
-    @torch.no_grad()
     def _denoise(
         self,
         batch: Diffusable,
         mask: dict[str, torch.Tensor],
         record: bool = False,
     ) -> SampleAndMeanAndMaybeRecords:
-        """Denoise from a prior sample to a t=eps_t sample."""
+        """Denoise from the prior to the final time.
+
+        SDE coefficients are memoized only for the duration of this call and
+        all wrapped methods are restored before returning.
+        """
+        if os.environ.get("SCOUT_DISABLE_SDE_CACHE") == "1":
+            return self._denoise_inner(batch, mask, record)
+        with cache_sde_coefficients(self._diffusion_module):
+            return self._denoise_inner(batch, mask, record)
+
+    @torch.no_grad()
+    def _denoise_inner(
+        self,
+        batch: Diffusable,
+        mask: dict[str, torch.Tensor],
+        record: bool = False,
+    ) -> SampleAndMeanAndMaybeRecords:
+        """Run the predictor-corrector denoising loop.
+
+        This method is called inside the scoped setup performed by
+        :meth:`_denoise`; guidance temporarily enables autograd only for the
+        position and unit-cell gradients it needs.
+        """
         recorded_samples = None
         if record:
             recorded_samples = []
@@ -307,7 +508,14 @@ class PredictorCorrector(Generic[Diffusable]):
 
         # Decreasing timesteps from T to eps_t
         timesteps = torch.linspace(self._max_t, self._eps_t, self.N, device=self._device)
-        dt = -torch.tensor((self._max_t - self._eps_t) / (self.N - 1)).to(self._device)
+        dt = torch.tensor(-(self._max_t - self._eps_t) / (self.N - 1), dtype=torch.float32, device=self._device)
+
+        predictor_fns = {
+            k: predictor.update_given_score for k, predictor in self._predictors.items()
+        }
+        corrector_fns = {
+            k: corrector.step_given_score for k, corrector in self._correctors.items()
+        } if self._correctors else {}
 
         for i in tqdm(range(self.N), miniters=50, mininterval=5):
             # Set the timestep
@@ -318,11 +526,8 @@ class PredictorCorrector(Generic[Diffusable]):
             if self._correctors and self.algo < 3:
                 for _ in range(self._n_steps_corrector):
                     score = self._score_fn(batch, t)
-                    fns = {
-                        k: corrector.step_given_score for k, corrector in self._correctors.items()
-                    }
                     samples_means: dict[str, Tuple[torch.Tensor, torch.Tensor]] = apply(
-                        fns=fns,
+                        fns=corrector_fns,
                         broadcast={"t": t, "dt": dt},
                         x=batch,
                         score=score,
@@ -349,25 +554,22 @@ class PredictorCorrector(Generic[Diffusable]):
                         )
                         self._backward_guidance(x0, t, score)
 
-                # Predictor updates to predict z_t-1
-            predictor_fns = {
-                    k: predictor.update_given_score for k, predictor in self._predictors.items()
-                }
+            # Predictor updates to predict z_t-1
             samples_means = apply(
-                    fns=predictor_fns,
-                    x=batch,
-                    score=score,
-                    broadcast=dict(t=t, batch=batch, dt=dt),
-                    batch_idx=self._multi_corruption._get_batch_indices(batch),
-                )
+                fns=predictor_fns,
+                x=batch,
+                score=score,
+                broadcast=dict(t=t, batch=batch, dt=dt),
+                batch_idx=self._multi_corruption._get_batch_indices(batch),
+            )
             if record:
                     recorded_samples.append(batch.clone().to("cpu"))
             
             for _ in range((self.self_rec_steps-1)*(t < self._multi_corruption.T * 0.9).all()):
-                # Compute unconditionnal score
+                # Compute the unconditional score at the recurrent state.
                 batch_, mean_batch_ = _mask_replace(
                     samples_means=samples_means, batch=batch, mean_batch=mean_batch, mask=mask
-                ) #z_t-1
+                )  # State at the previous diffusion step.
 
                 ############## Algorithm 1 ############
                 # Corrector updates.
@@ -391,7 +593,7 @@ class PredictorCorrector(Generic[Diffusable]):
                         )
                 ############## Algorithm 1 ############
                 
-                # Renoise the batch fieldwise
+                # Re-noise each field before the next recurrent refinement.
                 fns = {
                     k: self.forward_corruption
                     for k in self._multi_corruption.corrupted_fields
@@ -445,7 +647,7 @@ class PredictorCorrector(Generic[Diffusable]):
                         )
                         self._backward_guidance(x0, t, score)
                         del x0  # Clean up the temporary x0
-                    torch.cuda.empty_cache()  # Clear cache to free memory
+                    self._loop_empty_cache()
                 # Predictor updates to predict z_t-1
                 predictor_fns = {
                     k: predictor.update_given_score for k, predictor in self._predictors.items()
@@ -462,7 +664,7 @@ class PredictorCorrector(Generic[Diffusable]):
 
             batch, mean_batch = _mask_replace(
                     samples_means=samples_means, batch=batch, mean_batch=mean_batch, mask=mask
-                ) # Update batch and mean_batch ie z_t (the previous z_{t-1}finalise)
+                )  # Update the recurrent state.
 
         return batch, mean_batch, recorded_samples
 
