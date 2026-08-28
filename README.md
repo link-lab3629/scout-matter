@@ -157,12 +157,12 @@ images. The per-center loss is
 $$
 \mathcal L_a^{\mathrm{softplus}} =
 T\sum_{i=1}^{k}
-\operatorname{softplus}\!\left(\frac{d_{a,(i)}-(r_c-m)}{T}\right)
+\mathrm{softplus}\!\left(\frac{d_{a,(i)}-(r_c-m)}{T}\right)
 +T\sum_{i=k+1}^{M}
-\operatorname{softplus}\!\left(\frac{(r_c+m)-d_{a,(i)}}{T}\right),
+\mathrm{softplus}\!\left(\frac{(r_c+m)-d_{a,(i)}}{T}\right),
 $$
 
-with $\operatorname{softplus}(x)=\log(1+e^x)$. A sigmoid soft count $C_a$ is
+with $\mathrm{softplus}(x)=\log(1+e^x)$. A sigmoid soft count $C_a$ is
 also used to determine whether the center lies within the acceptable
 coordination interval $[k-\delta_{\mathrm{CN}},k+\delta_{\mathrm{CN}}]$:
 
