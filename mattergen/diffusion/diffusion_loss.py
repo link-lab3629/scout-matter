@@ -1,8 +1,15 @@
-import torch
 from functools import partial
 from typing import Callable, Dict
+
+import pandas as pd
+import torch
+from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
+from pymatgen.core import Composition
+
 from mattergen.common.data.chemgraph import ChemGraph
 from mattergen.diffusion.coordination_loss import (
+    # Public compatibility re-exports; coordination implementations live in
+    # coordination_loss.py.
     COORDINATION_CONFIG_KEYS,
     DEFAULT_COORDINATION_ALPHA,
     DEFAULT_COORDINATION_CN_TEMPERATURE,
@@ -12,16 +19,6 @@ from mattergen.diffusion.coordination_loss import (
     DEFAULT_COORDINATION_SATISFACTION_WEIGHT,
     DEFAULT_COORDINATION_TEMPERATURE,
     INTER_ATOMIC_CUTOFF,
-    _as_atomic_number_tuple,
-    _compute_target_coordination_share_single,
-    _coordination_margin_penalties_per_A_single,
-    _default_coordination_r_cut,
-    _normalize_coordination_mode,
-    _parse_coordination_constraint,
-    _parse_species_group,
-    _soft_neighbor_counts_per_A_single,
-    _validate_one_sided_coordination_groups,
-    _validate_target_coordination,
     compute_mean_coordination,
     compute_ranked_coordination,
     compute_target_coordination_share,
@@ -35,9 +32,41 @@ from mattergen.diffusion.coordination_loss import (
     target_coordination_loss,
     target_coordination_share_loss,
 )
-from pymatgen.core import Composition
-from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
-import pandas as pd
+
+
+__all__ = [
+    "COORDINATION_CONFIG_KEYS",
+    "DEFAULT_COORDINATION_ALPHA",
+    "DEFAULT_COORDINATION_CN_TEMPERATURE",
+    "DEFAULT_COORDINATION_CN_TOLERANCE",
+    "DEFAULT_COORDINATION_MARGIN",
+    "DEFAULT_COORDINATION_MODE",
+    "DEFAULT_COORDINATION_SATISFACTION_WEIGHT",
+    "DEFAULT_COORDINATION_TEMPERATURE",
+    "INTER_ATOMIC_CUTOFF",
+    "LOSS_REGISTRY",
+    "clear_globals",
+    "composition",
+    "compute_mean_coordination",
+    "compute_ranked_coordination",
+    "compute_target_coordination_share",
+    "compute_target_share",
+    "dominant_environment_loss",
+    "energy",
+    "environment_loss",
+    "group_coordination_loss",
+    "group_target_coordination_loss",
+    "make_combined_loss",
+    "mean_coordination_loss",
+    "new_loss",
+    "ranked_coordination_loss",
+    "target_coordination_loss",
+    "target_coordination_share_loss",
+    "volume",
+    "volume_loss",
+    "volume_pa",
+    "volume_pa_loss",
+]
 
 
 
