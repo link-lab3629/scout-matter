@@ -150,7 +150,7 @@ For central atom $a$, let $d_{a,(i)}$ be its $i$-th nearest periodic neighbor,
 $k$ the target coordination, $r_c$ the cutoff, $m$ the margin, $T$ the
 temperature, and $M$ the number of candidate neighbor images. Every selected
 neighbor atom is expanded over the $3\times3\times3=27$ cells with shifts in
-$\{-1,0,1\}^3$. For overlapping center and neighbor species, the neighbor list
+$\lbrace -1,0,1 \rbrace^3$. For overlapping center and neighbor species, the neighbor list
 excludes the atom's zero-shift self-image and retains its other periodic
 images. The per-center loss is
 
