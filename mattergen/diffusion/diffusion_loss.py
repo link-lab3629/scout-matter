@@ -1,10 +1,7 @@
 from functools import partial
 from typing import Callable, Dict
 
-import pandas as pd
 import torch
-from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
-from pymatgen.core import Composition
 
 from mattergen.common.data.chemgraph import ChemGraph
 from mattergen.diffusion.coordination_loss import (  # Public compatibility re-exports; coordination implementations live in; coordination_loss.py.  # noqa: E501
@@ -42,14 +39,11 @@ __all__ = [
     "DEFAULT_COORDINATION_TEMPERATURE",
     "INTER_ATOMIC_CUTOFF",
     "LOSS_REGISTRY",
-    "clear_globals",
-    "composition",
     "compute_mean_coordination",
     "compute_ranked_coordination",
     "compute_target_coordination_share",
     "compute_target_share",
     "dominant_environment_loss",
-    "energy",
     "environment_loss",
     "group_coordination_loss",
     "group_target_coordination_loss",
@@ -64,26 +58,6 @@ __all__ = [
     "volume_pa",
     "volume_pa_loss",
 ]
-
-
-PDIAG = None
-calc = None
-converter = None
-species_pairs = None
-target_values = None
-r_cuts = None
-target_tensor = None
-
-
-def clear_globals():
-    global PDIAG, calc, converter, species_pairs, target_values, r_cuts, target_tensor
-    PDIAG = None
-    calc = None
-    converter = None
-    species_pairs = None
-    target_values = None
-    r_cuts = None
-    target_tensor = None
 
 
 def volume(x, t):
@@ -131,91 +105,12 @@ def volume_pa_loss(x, t, target):
     return loss
 
 
-def composition(num, pos):
-    """Computes the composition of a list of atoms.
-
-    li is a list of int with 101 beeing an empty atom. Returns a list of strings with the chemical
-    symbols of the atoms. Example: [1, 101, 8, 8, 101] -> ['H', 'O', 'O']
-    """
-    return num[num != 101], pos[num != 101]
-
-
-def energy(x, t, target=None):
-    """Computes the energy above the hull for a given composition and energy.
-
-    x is a chemgraph batch The function uses a precomputed phase diagram to determine the energy
-    above the hull.
-    """
-    from mattersim.datasets.utils.convertor import ChemGraphBatchConvertor
-    from mattersim.forcefield.m3gnet.m3gnet import M3Gnet
-
-    global calc
-    global converter
-    if calc is None:
-        checkpoint = torch.load(
-            "/path/to/mattersim_torch/pretrained_models/mattersim-v1.0.0-1M.pth",
-            map_location="cuda",
-        )
-        model = M3Gnet(
-            **checkpoint["model_args"], device="cuda"
-        )  # Add arguments as needed for your configuration
-        model.load_state_dict(checkpoint["model"])  # Load the model state dict, ensure it's on cuda
-        model.eval()  # Set to evaluation mode for inference
-        model = model.to(x.pos.device)  # Move model to the same device as x
-    if converter is None:
-        converter = ChemGraphBatchConvertor(twobody_cutoff=5.0, threebody_cutoff=4.0, pbc=True)
-    if not isinstance(x, ChemGraph):
-        raise ValueError("x must be a ChemGraph object")
-
-    inputs = converter.convert(x)
-    energies = []
-    for input in inputs:
-        if input is None:
-            # If no atoms, append 0 to results
-            energies.append(torch.zeros(1, device=x.pos.device) * x.pos.sum() * x.cell.sum())
-        else:
-            temp = model(input)
-            if temp.isnan().any():
-                # If NaN, append 0 to results
-                energies.append(torch.zeros(1, device=x.pos.device) * x.pos.sum() * x.cell.sum())
-            else:
-                energies.append(temp)  # Otherwise compute the energy estimate
-    energies = torch.stack(energies)  # Stack the energies into a tensor
-    return energies
-
-
-def _energy_hull(x):
-    """Computes the energy above the hull for a given composition and energy.
-
-    x is a (Compo, Energy) tuple (str, float) CSV : Compo , Energy
-    """
-    dir = "/path/to/mattergenbis/phase_diagram/"  # This should be the directory where the phase diagram is saved  # noqa: E501
-    global PDIAG
-    if PDIAG is None:
-        # Load the CSV file only once
-        csv = pd.read_csv(dir + "LiCoO.csv")
-        li = [
-            PDEntry(composition=Composition(csv["Formula"][i]), energy=csv["Energy"][i])
-            for i in range(len(csv))
-        ]
-        PDIAG = PhaseDiagram(li)
-        del csv, li
-    x_ = PDEntry(
-        composition=Composition(x[0]), energy=x[1]
-    )  # Assuming x has composition and energy attributes
-    above_hull = PDIAG.get_e_above_hull(x_)
-    return above_hull
-
-
 def new_loss(x, t, target) -> torch.Tensor:
-    """Example of a new loss function.
+    """Placeholder for a user-defined guidance loss.
 
-    This is just a placeholder and should be replaced with an actual implementation.
+    Implement this function before passing ``new_loss`` through the guidance CLI.
     """
-    # x : ChemGraph object
-    # t : timestep
-    # target : target value
-    pass
+    raise NotImplementedError("Implement new_loss before using it.")
 
 
 def make_combined_loss(guidance_dict: dict) -> callable:
@@ -252,7 +147,6 @@ LOSS_REGISTRY: Dict[str, Callable[..., torch.Tensor]] = {
     "group_target_coordination": group_target_coordination_loss,
     "environment": environment_loss,
     "dominant_environment": dominant_environment_loss,
-    # "energy": energy,
     "new_loss": new_loss,  # Placeholder for a new loss function
     # Add more loss functions as needed
 }
