@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added gradient-enabled copies of positions and lattice cells.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 

@@ -1,3 +1,9 @@
+# Licensed under the MIT License.
+#
+# Added for scout-matter.
+# Example configuration for the former multiple_runs.sh workflow.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 batch_size: 22
 num_batches: 1
 runs: 50

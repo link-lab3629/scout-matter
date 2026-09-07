@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added CLI options for guidance, recurrence, backward steps, and GPU selection.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 

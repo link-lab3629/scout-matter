@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added the MP_40 atom-count distribution.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 

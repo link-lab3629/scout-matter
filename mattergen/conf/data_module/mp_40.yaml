@@ -1,3 +1,9 @@
+# Licensed under the MIT License.
+#
+# Added for scout-matter.
+# MP-40 data configuration adapted from MatterGen data-module conventions.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 _target_: mattergen.common.data.datamodule.CrystDataModule
 _recursive_: true
 properties: []

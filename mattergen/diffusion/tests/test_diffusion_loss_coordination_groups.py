@@ -1,3 +1,9 @@
+# Licensed under the MIT License.
+#
+# Added for scout-matter.
+# Tests for coordination objectives, grouped species, and guidance defaults.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 import pytest
 import torch
 from pymatgen.core import Element

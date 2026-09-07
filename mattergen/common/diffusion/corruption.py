@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added lattice and atom-count-scaled transitions between timesteps.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 

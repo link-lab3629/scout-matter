@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Replace NumPy math.factorial access with Python math.factorial.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 """Copyright (c) Facebook, Inc.
 
 and its affiliates. Copyright (c) Microsoft Corporation. Licensed under the MIT License. Adapted

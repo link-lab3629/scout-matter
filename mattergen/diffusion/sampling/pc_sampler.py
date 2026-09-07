@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added gradient guidance, backward correction, self-recurrence, and loss logging.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 

@@ -1,4 +1,10 @@
+<!-- Modified for scout-matter: usage, guidance objectives, and extension instructions.
+See UPSTREAM_CHANGES.md for provenance. -->
+
 # 🧪 scout-matter
+
+For the Microsoft MatterGen baseline, file-level modifications, and attribution
+policy, see [Changes from upstream MatterGen](UPSTREAM_CHANGES.md).
 
 This README explains how to use **scout-matter**, our modified version of Microsoft's MatterGen diffusion model, extended with custom **guidance functions** to bias crystal generation. These include **coordination targeting** and **volume control**. This functionality is entirely **training-free**: no retraining is required when adding new guidance objectives.
 

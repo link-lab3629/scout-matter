@@ -1,3 +1,9 @@
+# Licensed under the MIT License.
+#
+# Added for scout-matter.
+# Volume objectives, coordination re-exports, loss registry, and new_loss stub.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 from functools import partial
 from typing import Callable, Dict
 

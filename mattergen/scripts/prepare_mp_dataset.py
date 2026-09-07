@@ -1,3 +1,9 @@
+# Licensed under the MIT License.
+#
+# Added for scout-matter.
+# Materials Project dataset preparation from summary JSONL shards.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 """Prepare a MatterGen CSV dataset from Materials Project summary JSONL shards."""
 
 from __future__ import annotations

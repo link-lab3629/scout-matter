@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Use the selected generation device when loading checkpoints.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 

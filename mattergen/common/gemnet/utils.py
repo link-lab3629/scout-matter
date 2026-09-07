@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Handle empty sizes and zero repeats in repeat-block construction.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 """Copyright (c) Facebook, Inc.
 
 and its affiliates. Copyright (c) Microsoft Corporation. Licensed under the MIT License. Adapted
