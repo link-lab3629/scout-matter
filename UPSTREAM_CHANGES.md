@@ -49,7 +49,6 @@ This inventory records behavior-changing differences only.
 | File | Change |
 | --- | --- |
 | [`mattergen/common/data/chemgraph.py`](mattergen/common/data/chemgraph.py) | Added gradient-enabled copies of positions and lattice cells. |
-| [`mattergen/common/data/num_atoms_distribution.py`](mattergen/common/data/num_atoms_distribution.py) | Added the MP_40 atom-count distribution. |
 | [`mattergen/common/diffusion/corruption.py`](mattergen/common/diffusion/corruption.py) | Added lattice and atom-count-scaled transitions between timesteps. |
 | [`mattergen/common/gemnet/gemnet.py`](mattergen/common/gemnet/gemnet.py) | Use the selected generation device in graph construction. |
 | [`mattergen/common/gemnet/layers/basis_utils.py`](mattergen/common/gemnet/layers/basis_utils.py) | Replace NumPy math.factorial access with Python math.factorial. |
@@ -75,7 +74,6 @@ This inventory records behavior-changing differences only.
 | [`mattergen/diffusion/tests/test_diffusion_loss_coordination_groups.py`](mattergen/diffusion/tests/test_diffusion_loss_coordination_groups.py) | Tests for coordination objectives, grouped species, and guidance defaults. |
 | [`mattergen/diffusion/tests/test_pc_sampler_guidance.py`](mattergen/diffusion/tests/test_pc_sampler_guidance.py) | Tests for guided sampling and gradient normalization. |
 | [`mattergen/scripts/prepare_mp_dataset.py`](mattergen/scripts/prepare_mp_dataset.py) | Materials Project dataset preparation from summary JSONL shards. |
-| [`mattergen/conf/data_module/mp_40.yaml`](mattergen/conf/data_module/mp_40.yaml) | Configuration for the MP-40 atom-count distribution. |
 | [`examples/multiple_runs/kth_neighbor.yaml`](examples/multiple_runs/kth_neighbor.yaml) | Example configuration for ranked-neighbor coordination guidance. |
 | [`examples/multiple_runs/mean_coordination.yaml`](examples/multiple_runs/mean_coordination.yaml) | Example configuration for mean coordination guidance. |
 | [`examples/multiple_runs/target_coordination_share.yaml`](examples/multiple_runs/target_coordination_share.yaml) | Example configuration for target coordination-share guidance. |
