@@ -80,6 +80,14 @@ This inventory records behavior-changing differences only.
 | [`examples/multiple_runs/volume.yaml`](examples/multiple_runs/volume.yaml) | Example configuration for volume guidance. |
 | [`examples/multiple_runs/volume_per_atom.yaml`](examples/multiple_runs/volume_per_atom.yaml) | Example configuration for per-atom volume guidance. |
 
+## Packaging and installation
+
+| File | Change |
+| --- | --- |
+| [`pyproject.toml`](pyproject.toml) | Restricted support to Python 3.10, declared direct runtime dependencies, bounded setuptools below version 81, constrained native PyTorch Geometric dependencies to supported platforms, and included package data in built distributions. |
+| [`uv.lock`](uv.lock) | Locked the complete Python 3.10 dependency graph for reproducible installation. |
+| [`README.md`](README.md) | Added source-installation and verification instructions. |
+| [`.github/workflows/install-check.yml`](.github/workflows/install-check.yml) | Added a clean Python 3.10 installation and smoke-test workflow. |
 
 ## Validation
 

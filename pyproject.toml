@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Constrain the supported Python version and declare direct runtime dependencies.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 [tool.black]
 line-length = 100
 include = '\.pyi?$'
@@ -25,7 +29,7 @@ known_first_party = [
 [project]
 name = "mattergen"
 version = "1.0.3"
-requires-python = ">= 3.10"
+requires-python = ">=3.10,<3.11"
 description = "MatterGen is a generative model for inorganic materials design across the periodic table that can be fine-tuned to steer the generation towards a wide range of property constraints."
 readme = "README.md"
 license = "MIT"
@@ -34,9 +38,6 @@ classifiers = [
   "Intended Audience :: Science/Research",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Chemistry",
   "Topic :: Scientific/Engineering :: Physics",
 ]
@@ -60,12 +61,15 @@ dependencies = [
 "notebook>=7.2.2",
 "numpy<2.0",  # pin numpy before breaking changes in 2.0
 "omegaconf==2.3.0",
+"pandas>=2.0,<3",
 "pymatgen>=2024.6.4",
 "pylint",
 "pytest",
 "pytorch-lightning==2.0.6",
+"PyYAML>=6.0,<7",
+"scipy>=1.10,<2",
 "seaborn>=0.13.2",  # for plotting
-"setuptools",
+"setuptools>=77.0.3,<81",
 "SMACT",
 "sympy>=1.11.1",
 "torch==2.2.1+cu118; sys_platform == 'linux'", 
@@ -74,11 +78,12 @@ dependencies = [
 "torch==2.4.1; sys_platform == 'darwin'",
 "torchvision==0.19.1; sys_platform == 'darwin'",
 "torchaudio==2.4.1; sys_platform == 'darwin'",
-"torch_cluster",
+"torch_cluster; sys_platform == 'linux' or sys_platform == 'darwin'",
 "torch_geometric>=2.5",
-"torch_scatter",
-"torch_sparse",
+"torch_scatter; sys_platform == 'linux' or sys_platform == 'darwin'",
+"torch_sparse; sys_platform == 'linux' or sys_platform == 'darwin'",
 "tqdm",
+"typing-extensions>=4.8,<5",
 "wandb>=0.10.33",
 ]
 
@@ -92,6 +97,9 @@ csv-to-dataset = "mattergen.scripts.csv_to_dataset:main"
 
 [tool.setuptools.packages.find]
 include = ["mattergen*"]
+
+[tool.setuptools.package-data]
+"*" = ["**.yaml", "**.csv", "**.pt", "**.json"]
 
 [tool.uv.sources]
 torch = { index = "pytorch_linux",  marker = "sys_platform == 'linux'" }
@@ -123,5 +131,5 @@ explicit = true
 
 
 [build-system]
-requires = ["setuptools >=77.0.3"]
+requires = ["setuptools>=77.0.3,<81"]
 build-backend = "setuptools.build_meta"

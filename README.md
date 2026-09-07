@@ -10,6 +10,39 @@ This README explains how to use **scout-matter**, our modified version of Micros
 
 ---
 
+## Installation
+
+scout-matter currently supports CPython 3.10. The Linux dependency configuration
+uses CUDA 11.8 builds of PyTorch and PyTorch Geometric, so a compatible NVIDIA
+driver is required for GPU generation. Apple Silicon support follows MatterGen's
+experimental configuration.
+
+Install [Git LFS](https://git-lfs.com/) if you intend to use checkpoints stored in
+this repository, then create the environment and install the package with
+[uv](https://docs.astral.sh/uv/):
+
+```bash
+git lfs install
+git lfs pull
+
+python3 -m pip install "uv==0.7.8"
+uv sync --locked --python 3.10
+source .venv/bin/activate
+```
+
+Verify the installation before starting a generation run:
+
+```bash
+python -c "import mattergen, pandas, scipy, typing_extensions, yaml"
+mattergen-generate --help
+```
+
+The Git LFS commands may be omitted when checkpoints will be downloaded from
+Hugging Face on demand. On Apple Silicon, set
+`PYTORCH_ENABLE_MPS_FALLBACK=1` before training or generation.
+
+---
+
 ## 📅 Quick Start
 
 Illustrative example using mean-coordination guidance. Replace the `Co-O` pair,
