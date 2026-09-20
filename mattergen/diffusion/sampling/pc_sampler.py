@@ -385,7 +385,15 @@ class PredictorCorrector(Generic[Diffusable]):
             if record:
                 recorded_samples.append(batch.clone().to("cpu"))
 
-            for _ in range((self.self_rec_steps - 1) * (t < self._multi_corruption.T * 0.9).all()* (t + dt > 0).all()):
+            for _ in range(
+                self.self_rec_steps - 1
+                if (
+                    self.self_rec_steps > 1
+                    and (t < self._multi_corruption.T * 0.9).all()
+                    and (t + dt > 0).all()
+                )
+                else 0
+            ):
                 # Compute unconditionnal score
                 batch_, mean_batch_ = _mask_replace(
                     samples_means=samples_means, batch=batch, mean_batch=mean_batch, mask=mask
