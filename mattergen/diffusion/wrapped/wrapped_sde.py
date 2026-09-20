@@ -53,6 +53,20 @@ class WrappedSDEMixin:
         assert isinstance(self, SDE) and hasattr(_super, "prior_sampling")
         return self.wrap(_super.prior_sampling(shape=shape, conditioning_data=conditioning_data))
 
+    def sample_from_s(
+        self,
+        x: torch.Tensor,
+        t: torch.Tensor,
+        s: torch.Tensor,
+        batch_idx: B = None,
+        batch: Optional[BatchedData] = None,
+    ) -> torch.Tensor:
+        _super = super()
+        assert isinstance(self, SDE) and hasattr(_super, "sample_from_s")
+        return self.wrap(
+            _super.sample_from_s(x=x, t=t, s=s, batch_idx=batch_idx, batch=batch)
+        )
+
     def wrap(self, x):
         assert isinstance(self, SDE) and hasattr(self, "wrapping_boundary")
         return wrap_at_boundary(x, self.wrapping_boundary)
