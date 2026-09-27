@@ -8,6 +8,7 @@ mattergen.egg-info/
 log.txt
 log*.txt
 build/
+manuscript/
 
 #Material files
 *.vasp

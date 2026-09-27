@@ -182,6 +182,19 @@ class LatticeVPSDE(VPSDE):
         z = make_noise_symmetric_preserve_variance(z)
         return mean + expand(std, z.shape) * z
 
+    def sample_from_s(
+        self,
+        x: torch.Tensor,
+        t: torch.Tensor,
+        s: torch.Tensor,
+        batch_idx: B = None,
+        batch: BatchedData | None = None,
+    ) -> torch.Tensor:
+        mean, std = self.marginal_prob_from_s(x=x, t=t, s=s, batch=batch)
+        z = torch.randn_like(x)
+        z = make_noise_symmetric_preserve_variance(z)
+        return mean + expand(std, z.shape) * z
+
     def prior_sampling(
         self,
         shape: torch.Size | tuple,

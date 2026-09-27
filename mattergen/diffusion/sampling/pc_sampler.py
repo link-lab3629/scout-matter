@@ -144,6 +144,7 @@ class PredictorCorrector(Generic[Diffusable]):
         self.print_loss_history = print_loss_history  # Flag to control printing of loss history
         self.self_rec_steps = self_rec_steps
         self.back_step = back_step  # Number of steps to go back in the predictor-corrector loop
+        self.algo = algo
 
     @property
     def diffusion_module(self) -> DiffusionModule:
@@ -299,13 +300,13 @@ class PredictorCorrector(Generic[Diffusable]):
         s: torch.Tensor,
         k: str,
         batch_idx: torch.Tensor | None = None,
+        batch: Diffusable | None = None,
     ) -> Tuple[Diffusable, torch.Tensor]:
         """Forward pass for a corruption from s to t."""
+        corruption = self._multi_corruption.corruptions[k]
         return (
-            self._multi_corruption.corruptions[k].sample_from_s(batch_k, t, s, batch_idx=batch_idx),
-            self._multi_corruption.corruptions[k].marginal_prob_from_s(
-                batch_k, t, s, batch_idx=batch_idx
-            )[0],
+            corruption.sample_from_s(batch_k, t, s, batch_idx=batch_idx, batch=batch),
+            corruption.marginal_prob_from_s(batch_k, t, s, batch_idx=batch_idx, batch=batch)[0],
         )
 
     @torch.no_grad()
@@ -427,7 +428,7 @@ class PredictorCorrector(Generic[Diffusable]):
                 samples_means = apply(
                     fns=fns,
                     batch_k=batch_,
-                    broadcast={"t": t, "s": t + dt},
+                    broadcast={"t": t, "s": t + dt, "batch": batch_},
                     k={u: u for u in self._multi_corruption.corrupted_fields if u in batch_},
                     batch_idx=self._multi_corruption._get_batch_indices(batch_),
                 )

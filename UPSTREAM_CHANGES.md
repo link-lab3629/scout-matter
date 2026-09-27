@@ -62,6 +62,8 @@ This inventory records behavior-changing differences only.
 | [`mattergen/diffusion/d3pm/d3pm.py`](mattergen/diffusion/d3pm/d3pm.py) | Added discrete transition matrices and sampling from an intermediate state. |
 | [`mattergen/diffusion/diffusion_module.py`](mattergen/diffusion/diffusion_module.py) | Added clean-state prediction for guidance and example graph scaffolding. |
 | [`mattergen/diffusion/sampling/pc_sampler.py`](mattergen/diffusion/sampling/pc_sampler.py) | Added gradient guidance, backward correction, self-recurrence, and loss logging. |
+| [`mattergen/diffusion/tests/test_sampling.py`](mattergen/diffusion/tests/test_sampling.py) | Pass the required timestep increment to the corrector test. |
+| [`mattergen/diffusion/wrapped/wrapped_sde.py`](mattergen/diffusion/wrapped/wrapped_sde.py) | Added wrapped sampling between timesteps. |
 | [`mattergen/generator.py`](mattergen/generator.py) | Added guidance configuration, sampling controls, loss logging, and GPU selection. |
 | [`mattergen/scripts/generate.py`](mattergen/scripts/generate.py) | Added CLI options for guidance, recurrence, backward steps, and GPU selection. |
 
@@ -73,6 +75,8 @@ This inventory records behavior-changing differences only.
 | [`mattergen/diffusion/diffusion_loss.py`](mattergen/diffusion/diffusion_loss.py) | Volume objectives, coordination re-exports, loss registry, and new_loss stub. |
 | [`mattergen/diffusion/tests/test_diffusion_loss_coordination_groups.py`](mattergen/diffusion/tests/test_diffusion_loss_coordination_groups.py) | Tests for coordination objectives, grouped species, and guidance defaults. |
 | [`mattergen/diffusion/tests/test_pc_sampler_guidance.py`](mattergen/diffusion/tests/test_pc_sampler_guidance.py) | Tests for guided sampling and gradient normalization. |
+| [`mattergen/diffusion/tests/test_guidance_dispatch.py`](mattergen/diffusion/tests/test_guidance_dispatch.py) | Tests for the `--guidance` dispatch path from the CLI to the combined loss. |
+| [`mattergen/diffusion/tests/test_renoising_kernel.py`](mattergen/diffusion/tests/test_renoising_kernel.py) | Tests for re-noising kernels between timesteps and exact-score self-recurrence. |
 | [`mattergen/scripts/prepare_mp_dataset.py`](mattergen/scripts/prepare_mp_dataset.py) | Materials Project dataset preparation from summary JSONL shards. |
 | [`examples/multiple_runs/kth_neighbor.yaml`](examples/multiple_runs/kth_neighbor.yaml) | Example configuration for ranked-neighbor coordination guidance. |
 | [`examples/multiple_runs/mean_coordination.yaml`](examples/multiple_runs/mean_coordination.yaml) | Example configuration for mean coordination guidance. |
@@ -87,9 +91,14 @@ This inventory records behavior-changing differences only.
 | [`pyproject.toml`](pyproject.toml) | Restricted support to Python 3.10, declared direct runtime dependencies, bounded setuptools below version 81, constrained native PyTorch Geometric dependencies to supported platforms, and included package data in built distributions. |
 | [`uv.lock`](uv.lock) | Locked the complete Python 3.10 dependency graph for reproducible installation. |
 | [`README.md`](README.md) | Added source-installation and verification instructions. |
-| [`.github/workflows/install-check.yml`](.github/workflows/install-check.yml) | Added a clean Python 3.10 installation and smoke-test workflow. |
+| [`.github/workflows/install-check.yml`](.github/workflows/install-check.yml) | Added a clean Python 3.10 installation, smoke-test, and test-suite workflow. |
 
 ## Validation
 
-The cleanup reference searches and syntax checks passed. The targeted coordination
-pytest suite could not run because the configured environment lacks pytest.
+On a clean `uv sync --locked --python 3.10` environment with NVIDIA V100 GPUs, the full
+suite collects 192 tests. All pass except `test_train_on_one_batch`, which requires the
+Git LFS `mp_20` dataset cache, and two inherited upstream tests that use unseeded random
+structures and fail intermittently at float32 tolerance: `test_rdf` and
+`test_translation_invariance[3.0-10]`. The latter fails for the same 6 of 60 fixed seeds
+on this fork and on the upstream baseline. The CI workflow runs the suite on CPU and
+deselects these three tests.

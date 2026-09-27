@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added wrapped sampling between timesteps.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
@@ -41,6 +45,19 @@ class WrappedSDEMixin:
             # as typically we assume that the input data is inside the wrapping boundary (e.g., angles between 0 and 2*pi).  # noqa: E501
             print("Warning: Wrapped SDE has received input outside of the wrapping boundary.")
         noisy_x = _super.sample_marginal(x=x, t=t, batch_idx=batch_idx, batch=batch)
+        return self.wrap(noisy_x)
+
+    def sample_from_s(
+        self,
+        x: torch.Tensor,
+        t: torch.Tensor,
+        s: torch.Tensor,
+        batch_idx: torch.LongTensor = None,
+        batch: Optional[BatchedData] = None,
+    ) -> torch.Tensor:
+        _super = super()
+        assert isinstance(self, SDE) and hasattr(_super, "sample_from_s")
+        noisy_x = _super.sample_from_s(x=x, t=t, s=s, batch_idx=batch_idx, batch=batch)
         return self.wrap(noisy_x)
 
     def prior_sampling(
