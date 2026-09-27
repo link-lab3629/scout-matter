@@ -120,7 +120,9 @@ class PredictorCorrector(Generic[Diffusable]):
         predictor_partials = predictor_partials or {}
         if self._multi_corruption.discrete_corruptions:
             # These all have property 'N' because they are D3PM type
-            assert set(c.N for c in self._multi_corruption.discrete_corruptions.values()) == {N}  # type: ignore
+            assert set(c.N for c in self._multi_corruption.discrete_corruptions.values()) == {
+                N
+            }  # type: ignore
 
         self._predictors = {
             k: v(corruption=self._multi_corruption.corruptions[k], score_fn=None)

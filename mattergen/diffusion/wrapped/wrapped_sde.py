@@ -80,9 +80,7 @@ class WrappedSDEMixin:
     ) -> torch.Tensor:
         _super = super()
         assert isinstance(self, SDE) and hasattr(_super, "sample_from_s")
-        return self.wrap(
-            _super.sample_from_s(x=x, t=t, s=s, batch_idx=batch_idx, batch=batch)
-        )
+        return self.wrap(_super.sample_from_s(x=x, t=t, s=s, batch_idx=batch_idx, batch=batch))
 
     def wrap(self, x):
         assert isinstance(self, SDE) and hasattr(self, "wrapping_boundary")

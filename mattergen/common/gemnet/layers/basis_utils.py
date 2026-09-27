@@ -113,7 +113,9 @@ def associated_legendre_polynomials(
     Returns -------     polynomials: list         Contains the sympy functions of the polynomials
     (in total L many if zero_m_only is True else L^2 many).
     """
-    # calculations from http://web.cmb.usc.edu/people/alber/Software/tomominer/docs/cpp/group__legendre__polynomials.html
+    # calculations from
+    # http://web.cmb.usc.edu/people/alber/Software/tomominer/docs/cpp/
+    # group__legendre__polynomials.html
     z = sym.symbols("z")
     P_l_m = [
         [0] * (2 * l_degree + 1) for l_degree in range(L_maxdegree)

@@ -244,7 +244,9 @@ class SetUnconditionalEmbeddingType:
         return replace_use_unconditional_embedding(
             batch=x,
             use_unconditional_embedding={
-                cond_field: torch.ones((len(x[cond_field]), 1), dtype=torch.bool, device=device)  # type: ignore
+                cond_field: torch.ones(
+                    (len(x[cond_field]), 1), dtype=torch.bool, device=device
+                )  # type: ignore
                 for cond_field in cond_fields
             },
         )

@@ -96,7 +96,9 @@ def repeat_blocks(
     repeat_inc: int = 0,
 ) -> torch.Tensor:
     """Repeat blocks of indices.
-    Adapted from https://stackoverflow.com/questions/51154989/numpy-vectorized-function-to-repeat-blocks-of-consecutive-elements
+    Adapted from
+    https://stackoverflow.com/questions/51154989/
+    numpy-vectorized-function-to-repeat-blocks-of-consecutive-elements
 
     continuous_indexing: Whether to keep increasing the index after each block
     start_idx: Starting index

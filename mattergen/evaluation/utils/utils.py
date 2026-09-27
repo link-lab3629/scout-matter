@@ -62,7 +62,10 @@ def compute_rmsd_angstrom(struc1: Structure, struc2: Structure) -> float:
     """Compute RMSD during relaxation in units of angstrom."""
     match = RMSDStructureMatcher().get_rms_dist(struc1, struc2)
 
-    # copied from https://github.com/materialsproject/pymatgen/blob/5c174bfaf7a97eef9f6b3d1ba3499b0e8764d9e8/pymatgen/analysis/structure_matcher.py#L451-L453
+    # copied from
+    # https://github.com/materialsproject/pymatgen/blob/
+    # 5c174bfaf7a97eef9f6b3d1ba3499b0e8764d9e8/
+    # pymatgen/analysis/structure_matcher.py#L451-L453
     def av_lat(l1: Lattice, l2: Lattice):
         params = (np.array(l1.parameters) + np.array(l2.parameters)) / 2
         return Lattice.from_parameters(*params)
