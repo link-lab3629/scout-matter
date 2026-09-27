@@ -56,11 +56,11 @@ dependencies = [
 "matplotlib==3.8.4",
 "matscipy>=0.7.0",
 "mattersim>=1.1",
-"monty==2024.7.30 ",  # keep up-to-date together with pymatgen, atomate2
+"monty==2025.1.9",  # keep up-to-date together with pymatgen, atomate2
 "notebook>=7.2.2",
 "numpy<2.0",  # pin numpy before breaking changes in 2.0
 "omegaconf==2.3.0",
-"pymatgen>=2024.6.4",
+"pymatgen>=2025.1.9",
 "pylint",
 "pytest",
 "pytorch-lightning==2.0.6",
