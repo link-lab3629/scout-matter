@@ -303,7 +303,7 @@ class VESDE(SDE):
         std = maybe_expand(
             self.sigma_min
             * (self.sigma_max / self.sigma_min) ** s
-            * np.sqrt((self.sigma_max / self.sigma_min) ** (2 * (t - s)) - 1),
+            * torch.sqrt((self.sigma_max / self.sigma_min) ** (2 * (t - s)) - 1),
             batch_idx,
             x,
         )
