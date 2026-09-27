@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added discrete transition matrices and sampling from an intermediate state.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) 2022 The Google Research Authors.
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.

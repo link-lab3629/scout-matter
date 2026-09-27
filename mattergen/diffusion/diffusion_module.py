@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added clean-state prediction for guidance and example graph scaffolding.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 

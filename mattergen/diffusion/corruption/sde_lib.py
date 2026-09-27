@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added SDE marginals and sampling between timesteps.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 """Copyright 2020 The Google Research Authors. Copyright (c) Microsoft Corporation. Licensed under
 the MIT License.
 

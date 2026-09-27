@@ -1,3 +1,9 @@
+# Licensed under the MIT License.
+#
+# Added for scout-matter.
+# Coordination objectives with grouped species and ranked-neighbor penalties.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 import math
 from typing import Any
 

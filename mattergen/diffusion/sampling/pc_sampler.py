@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added gradient guidance, backward correction, self-recurrence, and loss logging.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
@@ -140,6 +144,7 @@ class PredictorCorrector(Generic[Diffusable]):
         self.print_loss_history = print_loss_history  # Flag to control printing of loss history
         self.self_rec_steps = self_rec_steps
         self.back_step = back_step  # Number of steps to go back in the predictor-corrector loop
+        self.algo = algo
 
     @property
     def diffusion_module(self) -> DiffusionModule:
@@ -298,13 +303,10 @@ class PredictorCorrector(Generic[Diffusable]):
         batch: Diffusable | None = None,
     ) -> Tuple[Diffusable, torch.Tensor]:
         """Forward pass for a corruption from s to t."""
+        corruption = self._multi_corruption.corruptions[k]
         return (
-            self._multi_corruption.corruptions[k].sample_from_s(
-                batch_k, t, s, batch_idx=batch_idx, batch=batch
-            ),
-            self._multi_corruption.corruptions[k].marginal_prob_from_s(
-                batch_k, t, s, batch_idx=batch_idx, batch=batch
-            )[0],
+            corruption.sample_from_s(batch_k, t, s, batch_idx=batch_idx, batch=batch),
+            corruption.marginal_prob_from_s(batch_k, t, s, batch_idx=batch_idx, batch=batch)[0],
         )
 
     @torch.no_grad()

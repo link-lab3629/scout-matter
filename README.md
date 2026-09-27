@@ -1,6 +1,45 @@
+<!-- Modified for scout-matter: usage, guidance objectives, and extension instructions.
+See UPSTREAM_CHANGES.md for provenance. -->
+
 # 🧪 scout-matter
 
+For the Microsoft MatterGen baseline, file-level modifications, and attribution
+policy, see [Changes from upstream MatterGen](UPSTREAM_CHANGES.md).
+
 This README explains how to use **scout-matter**, our modified version of Microsoft's MatterGen diffusion model, extended with custom **guidance functions** to bias crystal generation. These include **coordination targeting** and **volume control**. This functionality is entirely **training-free**: no retraining is required when adding new guidance objectives.
+
+---
+
+## Installation
+
+scout-matter currently supports CPython 3.10. The Linux dependency configuration
+uses CUDA 11.8 builds of PyTorch and PyTorch Geometric, so a compatible NVIDIA
+driver is required for GPU generation. Apple Silicon support follows MatterGen's
+experimental configuration.
+
+Install [Git LFS](https://git-lfs.com/) if you intend to use checkpoints stored in
+this repository, then create the environment and install the package with
+[uv](https://docs.astral.sh/uv/):
+
+```bash
+git lfs install
+git lfs pull
+
+python3 -m pip install "uv==0.7.8"
+uv sync --locked --python 3.10
+source .venv/bin/activate
+```
+
+Verify the installation before starting a generation run:
+
+```bash
+python -c "import mattergen, pandas, scipy, typing_extensions, yaml"
+mattergen-generate --help
+```
+
+The Git LFS commands may be omitted when checkpoints will be downloaded from
+Hugging Face on demand. On Apple Silicon, set
+`PYTORCH_ENABLE_MPS_FALLBACK=1` before training or generation.
 
 ---
 
@@ -391,19 +430,13 @@ kept separately in `mattergen/diffusion/coordination_loss.py`.
 
 ### Step 1: Define Your Custom Loss
 
-Create a new loss function that takes predicted structures as a `ChemGraphBatch` object as input and returns a scalar or tensor loss. For example:
+Create a loss function that takes predicted structures as a `ChemGraphBatch` object and returns a
+scalar or tensor loss. The repository includes this placeholder:
 
 ```python
-def new_loss(x, t, target):
-    """
-    Example of a new loss function.
-    This is just a placeholder and should be replaced with an actual implementation.
-    """
-    # x : ChemGraph object (ChemGraphBatch usually)
-    # t : timestep
-    # target : target value
-    # Return : torch.tensor with the same size as the batch
-    pass
+def new_loss(x, t, target) -> torch.Tensor:
+    """Placeholder for a user-defined guidance loss."""
+    raise NotImplementedError("Implement new_loss before using it.")
 ```
 
 ### Step 2: Register the Loss in `LOSS_REGISTRY`
@@ -414,13 +447,13 @@ Add the name of your new loss function in the `LOSS_REGISTRY`:
 LOSS_REGISTRY: Dict[str, Callable[..., torch.Tensor]] = {
     "volume": volume_loss,
     "environment": environment_loss,
-    "energy": energy,
     "new_loss": new_loss,  # Placeholder for a new loss function
     # Add more loss functions as needed
 }
 ```
 
-This allows the key `"new_loss"` to be passed in the CLI `--guidance` argument.
+This allows the key `"new_loss"` to be passed in the CLI `--guidance` argument after its
+implementation has been added to `diffusion_loss.py`.
 
 ### Step 3: Use Your Loss via CLI
 
@@ -430,7 +463,8 @@ Pass your custom objective directly from the command line:
 --guidance="{'new_loss': target_value}"
 ```
 
-This value will be routed into your `new_loss` implementation as the input `target` automatically at generation time.
+This value will be routed into your `new_loss` implementation as the input `target` automatically
+at generation time.
 
 ---
 

@@ -1,3 +1,7 @@
+# Modified for scout-matter.
+# Added lattice and atom-count-scaled transitions between timesteps.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
@@ -174,6 +178,19 @@ class LatticeVPSDE(VPSDE):
         batch: BatchedData | None = None,
     ) -> torch.Tensor:
         mean, std = self.marginal_prob(x=x, t=t, batch=batch)
+        z = torch.randn_like(x)
+        z = make_noise_symmetric_preserve_variance(z)
+        return mean + expand(std, z.shape) * z
+
+    def sample_from_s(
+        self,
+        x: torch.Tensor,
+        t: torch.Tensor,
+        s: torch.Tensor,
+        batch_idx: B = None,
+        batch: BatchedData | None = None,
+    ) -> torch.Tensor:
+        mean, std = self.marginal_prob_from_s(x=x, t=t, s=s, batch=batch)
         z = torch.randn_like(x)
         z = make_noise_symmetric_preserve_variance(z)
         return mean + expand(std, z.shape) * z

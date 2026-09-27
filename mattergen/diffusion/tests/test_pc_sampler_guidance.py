@@ -1,3 +1,9 @@
+# Licensed under the MIT License.
+#
+# Added for scout-matter.
+# Tests for guided sampling and gradient normalization.
+# See UPSTREAM_CHANGES.md for the upstream baseline and change inventory.
+
 from types import SimpleNamespace
 
 import torch
