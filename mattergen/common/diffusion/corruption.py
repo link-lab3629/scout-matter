@@ -178,7 +178,7 @@ class LatticeVPSDE(VPSDE):
         z = make_noise_symmetric_preserve_variance(z)
         return mean + expand(std, z.shape) * z
 
-    def sample_marginal_from_s(
+    def sample_from_s(
         self,
         x: torch.Tensor,
         t: torch.Tensor,
